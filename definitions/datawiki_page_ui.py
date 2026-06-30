@@ -1,4 +1,5 @@
 import pandas as pd
+import re
 from shiny import ui, render, reactive
 from faicons import icon_svg
 
@@ -38,11 +39,23 @@ download_icon = (
     )
 
 datawiki_table[' '] = [
-        ui.HTML(f'<a href="{url}" target="_blank">{download_icon}</a>')
+        ui.HTML(f'<a href="{url}" target="_blank" class="guru-link">{download_icon}</a>')
         if url and str(url).strip() not in ("", "nan", "None")
         else ""
         for url in datawiki_table[' ']
     ]
+
+def _style_location(loc: str) -> object:
+    """Replace ' > ' separators with a faint-colored version."""
+    if not loc or str(loc).strip() in ("", "nan"):
+        return ""
+    styled = str(loc).replace(
+        " > ",' <span style="color: var(--genr-lightblue); font-weight: 400;"> ▸ </span>'
+    )
+    return ui.HTML(styled)
+
+datawiki_table['Location'] = datawiki_table['Location'].apply(_style_location)
+
 
 # datawiki_sheets = pd.read_excel('assets/DataWiki_scrape_120922.xlsx', sheet_name=None, index_col=0)
 # combine all sheets to a single dataframe
@@ -135,23 +148,25 @@ datawiki_table_style = [
 
 # Server side ==================
 
+def _contains_any(series, values):
+    """Return boolean mask: rows where series contains any of the values (partial match)."""
+    pattern = '|'.join(map(re.escape, values))
+    return series.str.contains(pattern, na=False, regex=True)
 
-def filter_datawiki_table(selected_periods,
-                          selected_datatypes,
-                          selected_filenames,
+
+def filter_datawiki_table(selected_periods, selected_datatypes, selected_filenames,
                           table=datawiki_table):
+    filters = [
+        (selected_periods,   'Period'),
+        (selected_datatypes, 'Data type'),
+        (selected_filenames, 'File name'),
+    ]
 
-    if len(selected_periods) > 0:
-        table = table.loc[table['Period'].str.contains('|'.join(list(selected_periods)), na=False, regex=False), ]
-
-    if len(selected_datatypes) > 0:
-        table = table.loc[table['Data type'].str.contains('|'.join(list(selected_datatypes)), na=False, regex=False), ]
-
-    if len(selected_filenames) > 0:
-        table = table.loc[table['File name'].str.contains('|'.join(list(selected_filenames)), na=False, regex=False), ]
+    for values, col in filters:
+        if values:
+            table = table[_contains_any(table[col], values)]
 
     return table
-
 
 def datawiki_reactivity(input, output):
 

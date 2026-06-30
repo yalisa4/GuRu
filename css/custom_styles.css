@@ -58,6 +58,18 @@ h6 {
     background-color: var(--genr-lightblue);
 }
 
+
+/* Default state */
+.guru-link {
+    color: var(--genr-lightblue);      /* uses your CSS variable */
+    text-decoration: none;
+}
+
+/* Hover state */
+.guru-link:hover {
+    color: var(--genr-blue);
+}
+
 /* Style checkboxes */
 .shiny-input-container .checkbox input[type="checkbox"] {
     border: 1px solid var(--genr-blue);
