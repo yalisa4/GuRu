@@ -79,12 +79,12 @@ def _(Path, date):
         r"content:", # the contents of a zip file ... 
         r"\.rdata\b",
         r"\.csv\b",
-    
-    
+
+
         # Deprecated or preliminary data files 
         r"please do not use this version",  
         r"^\s*preliminary data\s*$",
-    
+
         # Cross ref patterns - avoid parsing files multiple times (?) 
         r"^see also\b",
         r"^go to\b",
@@ -112,6 +112,18 @@ def _(df):
 
 
 @app.cell
+def _(df):
+    n_parts = df["file_name"].str.split(" ").str.len()
+
+    # Rows with more than one part (i.e., contains at least one space)
+    multi_word = df[n_parts > 1]
+
+    print(f"{len(multi_word)} rows have more than one group")
+    multi_word
+    return
+
+
+@app.cell
 def _(DataRecord, GenRWikiScraper, OUTPUT_FILE):
     # ── Entry point ──────────────────────────────────────────────────────────────
 
@@ -122,7 +134,7 @@ def _(DataRecord, GenRWikiScraper, OUTPUT_FILE):
         # Save (tabular) output
         df = DataRecord.to_dataframe(records)
         df.to_csv(OUTPUT_FILE, index=False)
-    
+
         print(f"\nTotal records: {len(records)}")
 
         for record in records:
@@ -154,7 +166,7 @@ def _(ClassVar, Optional, asdict, dataclass, pd):
         def __str__(self) -> str:
             fields = [
                 ("File",          self.file_name),
-                ("URL",           self.file_url or "(DM request)"),
+                ("URL",           self.file_url or ""),
                 ("PI",            self.pi),
                 ("Notes",         self.other_notes),
                 ("Cohort",        self.cohort),
@@ -170,7 +182,7 @@ def _(ClassVar, Optional, asdict, dataclass, pd):
             "file_name", "cohort", "period", "data_type",
             "wiki_path", "file_url", "pi", "other_notes",
         ]
-    
+
         @staticmethod
         def to_dataframe(records: list["DataRecord"]) -> pd.DataFrame:
             return pd.DataFrame([asdict(r) for r in records], columns=DataRecord.COLUMNS)
@@ -287,7 +299,7 @@ def _(
                     return idx, variant
             return -1, ""
 
-    
+
         def parse_direct_download(self, p) -> tuple[str, str, Optional[str]]:
             """Returns (file_name, pi, other_notes, url)."""
             raw = self._text(p)
@@ -297,9 +309,9 @@ def _(
             # TMP: catch incorrect urls?
             # "https://epi-wiki.erasmusmc.nl/wiki/data"
             # ... only one, ask dm to fix it 
-        
+
             name, notes = self._split_basket(raw)
-        
+
             pi = self._extract_pi(notes)
             notes = self._strip_pi(notes)
 
@@ -313,17 +325,18 @@ def _(
             # Extract PI from wherever it appears
             pre = raw[:idx]
             post = raw[idx + len(trigger):]
-        
+
             pi = (self._extract_pi(pre) or self._extract_pi(post))
 
             name  = self._strip_pi(pre)
             notes = self._strip_pi(post)
-    
+
             # Fallback: grab filename from <b> or <a> if still empty
-            if not name:
-                tag  = p.find("b") or p.find("a")
-                name = tag.get_text(strip=True) if tag else ""
-    
+            # if not name:
+            #     tag  = p.find("b") or p.find("a")
+            #     name = tag.get_text(strip=True) if tag else ""
+            notes = f'Request from DM {notes}'
+
             return name, pi, notes
 
         def parse_pi_only(self, p) -> tuple[str, str]:
@@ -336,27 +349,33 @@ def _(
         def parse_local_path(self, p) -> tuple[str, str]:
             """Returns (file_name, pi, other_notes) for paragraphs containing a UNC network path."""
             raw = self._text(p)
-    
+
+            quotes = "'\"\u2018\u2019\u201c\u201d"
+
             # Find where the UNC path starts
-            unc_match = re.search(r"\\\\[\w\-.]", raw)
-            if not unc_match:
+            # Match an optionally-quoted local path
+            path_match = re.search(rf"[{quotes}]?(\\\\[^{quotes}]+?)[{quotes}]?(?=\s|$)", raw)
+            if not path_match:
                 return raw, "", ""
-    
-            pre = raw[:unc_match.start()]  # everything before the UNC path
-            post = raw[unc_match.start():] # UNC path + everything after
 
-            # Remove the lead-in phrase ("available in", "use file", etc.) from pre
-            pre = re.sub(r",?\s*(available in|use file|located at|use)\s*['\"]?\s*$", 
-                         "", pre, flags=re.IGNORECASE).strip()
-    
+            path = path_match.group(1).strip()
+
+            pre = raw[:path_match.start()] # everything before the (optional) opening quote
+            suffix = raw[path_match.end():].strip() # trailing text, e.g. "(due to filesize)"
+
+            # Remove the lead-in phrase ("available in", "available at", "use file", etc.)
+            pre = re.sub(rf",?\s*(available in|available at|use file)\s*[{quotes}]?\s*$",
+                     "", pre, flags=re.IGNORECASE).strip()
+
             # Extract PI from pre if present, then strip it to get the filename
-            pi = self._extract_pi(pre)
-            name = self._strip_pi(pre).rstrip(",. '\"(")
+            pi = self._extract_pi(pre) or self._extract_pi(suffix)
+            name = self._strip_pi(pre).rstrip(f",. {quotes}(")
 
+            suffix_clean = self._strip_pi(suffix)
+        
             # Clean up the note: keep full path including closing ) if present
-            path_text = post.strip().rstrip("'")
-            other_notes = f"available at '{path_text}'"
-    
+            other_notes = f"Available at '{path}' {suffix_clean}"
+        
             return name, pi, other_notes
 
 
@@ -374,19 +393,19 @@ def _(
         def scrape(self, page_url: str, context: dict) -> list[DataRecord]:
             response = self.session.get(f"{BASE_URL}/{page_url}", timeout=30)
             soup = BeautifulSoup(response.content, "html.parser")
-    
+
             records: list[DataRecord] = []
             last_record: Optional[DataRecord] = None
-    
+
             # Path segments fixed from the main page: cohort > period > link_label
             base_path = context["wiki_path"] # already built by GenRWikiScraper
             current_label = "" # updated by bold <p> subheadings
-    
+
             def current_path() -> str:
                 return " > ".join(s for s in [base_path, current_label] if s)
 
             for element in soup.find_all(["p"]):
-            
+
                 p = element
                 clf = self.classifier
 
@@ -397,19 +416,19 @@ def _(
                 if clf.is_subheading(p):
                     current_label = p.get_text(strip=True)
                     continue
-    
+
                 if clf.is_cross_ref(p):
                     if last_record is not None:
                         last_record.append_note(p.get_text(separator=" ", strip=True))
                     continue
-    
+
                 local_context = {
                     **context,
                     # "data_type": current_label or context["data_type"],
                     "wiki_path": current_path(),
                 }
                 record = self._parse_paragraph(p, local_context)
-    
+
                 if record is not None:
                     records.append(record)
                     last_record = record
@@ -417,7 +436,7 @@ def _(
                     print(f"Problem: ~{p.get_text(separator=' ', strip=True)}~")
                     print(f"  wiki_path: {current_path()}")
                     print("-" * 50)
-    
+
             return records
 
         def _parse_paragraph(self, p, context: dict) -> Optional[DataRecord]:
@@ -433,14 +452,15 @@ def _(
                 name, pi, notes = par.parse_dm_request(p)
                 return DataRecord(**context, 
                                   file_name=name, pi=pi, other_notes=notes)
-
+        
+            if clf.is_local_path(p):
+                name, pi, notes = par.parse_local_path(p)
+                return DataRecord(**context, file_name=name, pi=pi, other_notes=notes)
+        
             if clf.is_pi_only(p):
                 name, pi = par.parse_pi_only(p)
                 return DataRecord(**context, file_name=name, pi=pi)
 
-            if clf.is_local_path(p):
-                name, pi, notes = par.parse_local_path(p)
-                return DataRecord(**context, file_name=name, pi=pi, other_notes=notes)
 
             return None
 
@@ -515,12 +535,12 @@ def _(
                 if ParagraphClassifier.is_subheading(candidate):
                     data_type = candidate.get_text(strip=True)
                     break
-                
+
             wiki_path = " > ".join(s for s in [cohort, period, data_type] if s)
 
             return {"cohort": cohort, "period": period,
                     "data_type": data_type, "wiki_path": wiki_path}
-        
+
         def _process_link(self, link) -> None:
             page_url = link["href"]
             context  = self._build_context(link)

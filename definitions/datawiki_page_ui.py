@@ -3,6 +3,8 @@ import re
 from shiny import ui, render, reactive
 from faicons import icon_svg
 
+from pathlib import Path
+from datetime import datetime
 # from definitions.ui_elements import file_selector
 
 from definitions.terms_and_styles import user_input_panel_style, banner_panel
@@ -11,10 +13,24 @@ from definitions.terms_and_styles import user_input_panel_style, banner_panel
 # ==========================================================================================
 page_id = 'datawiki'
 
-INPUT_FILE = 'assets/datawiki_scrape_20260629.csv'
-# Read cleaned datawiki scrape
+INPUT_DIR = Path(__file__).parent.parent / "assets"
+
+# Get all scrapes (old and recent)
+INPUT_FILES = list(INPUT_DIR.glob("datawiki_scrape_*.csv"))
+
+if not INPUT_FILES:
+    raise FileNotFoundError("No matching datawiki_scrape_*.csv files found.")
+
+def extract_date(p: Path) -> str:
+    m = re.search(r"datawiki_scrape_(\d{4}-?\d{2}-?\d{2})", p.stem)
+    return m.group(1) if m else ""
+
+# Most recent file
+INPUT_FILE = max(INPUT_FILES, key=extract_date)
 
 datawiki_scrape = pd.read_csv(INPUT_FILE)
+
+update_date = datetime.strptime(extract_date(INPUT_FILE), "%Y%m%d").strftime("%d %B %Y")
 
 col_map = {
     "period": "Period",
@@ -56,14 +72,6 @@ def _style_location(loc: str) -> object:
 
 datawiki_table['Location'] = datawiki_table['Location'].apply(_style_location)
 
-
-# datawiki_sheets = pd.read_excel('assets/DataWiki_scrape_120922.xlsx', sheet_name=None, index_col=0)
-# combine all sheets to a single dataframe
-# datawiki_table = pd.concat(datawiki_sheets.values()).rename(columns={
-    # 'Period': 'Period', 'Type': 'Data type', 'Sub1': 'Sub-header 1', 'Sub2': 'Sub-header 2',
-    # 'File': 'File name', 'PIs': 'PIs'})
-
-
 def file_selector(page_id):
     file_options = list(datawiki_table['File name'].unique())
 
@@ -103,6 +111,9 @@ def datatype_selector(page_id):
 def datawiki_page(tab_name):
     return ui.nav_panel(" DataWiki map",
                         banner_panel,
+                        ui.div(
+                            ui.markdown(f"Last updated on: <span style='color: var(--genr-blue);'>**{update_date}**</span>"),
+                            style="text-align: right; padding-right: 20px; padding-bottom: 0px; margin: 0"),
                         # Selection pane
                         ui.div(
                             ui.layout_columns(
