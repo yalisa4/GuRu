@@ -4,7 +4,38 @@ from shinywidgets import output_widget
 from faicons import icon_svg
 from definitions.terms_and_styles import placeholder_panel
 
+from .welcome_page_backend import reporter_colors
 page_id = 'welcome'
+
+def information_about_wave():
+    return ui.div(
+        ui.span("Information about",
+        style="""
+        font-size:12px;
+        margin:0;
+        """),
+
+        *[
+            ui.div(
+                ui.span("●", style=f"""
+                color:{color};
+                font-size:20px;
+                """),
+                ui.span(key),
+                style="""
+                display:flex; 
+                align-items:center; 
+                gap:4px;
+                """
+            )
+            for key, color in reporter_colors.items()
+        ],
+        style="""
+        display:flex; 
+        align-items:center; 
+        gap:12px;
+        """
+    )
 
 def welcome_page(tab_name):
 
@@ -54,7 +85,7 @@ def welcome_page(tab_name):
                                 margin-bottom:6px;
                                 """
                             ),
-                        
+                            information_about_wave(),
                             output_widget("timeline", fillable=True)),
                         icon=icon_svg('gamepad'),
                         value=tab_name)
