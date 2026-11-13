@@ -415,3 +415,41 @@ shiny-data-frame .shiny-data-grid > table > thead {
     fill: currentColor;
     height: 0.9em;
 }
+
+/* Timeline on Welcome page */
+.timeline-header-title {
+    font-size:22px;
+    color: var(--genr-blue);
+    margin:0;
+}
+.timeline-header-undertitle {
+    display:flex;
+    gap:16px;
+    align-items:flex-start;
+}
+.timeline-hr {
+    border:none;
+    border-top:1px solid;
+    margin-top:4px;
+    margin-bottom:6px;
+}
+.timeline-header-div {
+    width:32px;
+    height:32px;
+    border-radius:50%;
+    background-color:#F3F0FF;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:14px;
+    font-weight:600;
+}
+.timeline-information-about-span {
+    font-size:12px;
+    margin:0;
+}
+.timeline-information-about-div {
+    display:flex; 
+    align-items:center; 
+    gap:12px;
+}

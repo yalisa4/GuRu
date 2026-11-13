@@ -7,14 +7,25 @@ from definitions.terms_and_styles import placeholder_panel
 from .welcome_page_backend import reporter_colors
 page_id = 'welcome'
 
+
+def timeline_header():
+    return(ui.div(
+        ui.div("1",
+        class_="timeline-header-div"),
+         ui.div(
+            ui.h2("Explore the timeline",
+            class_="timeline-header-title"),
+            ui.p("Select a wave to inspect its metadata and associated files")
+            ),
+            class_="timeline-header-undertitle"),
+            ui.hr(
+            class_="timeline-hr"),
+            )
+
 def information_about_wave():
     return ui.div(
         ui.span("Information about",
-        style="""
-        font-size:12px;
-        margin:0;
-        """),
-
+        class_="timeline-information-about-span"),
         *[
             ui.div(
                 ui.span("●", style=f"""
@@ -30,11 +41,7 @@ def information_about_wave():
             )
             for key, color in reporter_colors.items()
         ],
-        style="""
-        display:flex; 
-        align-items:center; 
-        gap:12px;
-        """
+        class_="timeline-information-about-div"
     )
 
 def welcome_page(tab_name):
@@ -43,48 +50,7 @@ def welcome_page(tab_name):
                         placeholder_panel('This *Timeline* plot is a placeholder, the age spans and assessment ids need to be cleaned and updated with additional info.' \
                             '&ensp;A **sample size overlap tool** based on the same data is also currently under development'),
                         ui.page_fluid(
-
-                            ui.div(
-                                ui.div("1",
-                                        style="""
-                                        width:32px;
-                                        height:32px;
-
-                                        border-radius:50%;
-
-                                        background-color:#F3F0FF;
-
-                                        display:flex;
-                                        align-items:center;
-                                        justify-content:center;
-
-                                        font-size:14px;
-                                        font-weight:600;
-                                        """),
-                                ui.div(
-                                    ui.h2("Explore the timeline",
-                                    style="""
-                                    font-size:22px;
-                                    color:#2c3c94;
-                                    margin:0;
-                                    """),
-                                    ui.p("Select a wave to inspect its metadata and associated files")
-                                ),
-
-                                style="""
-                                display:flex;
-                                gap:16px;
-                                align-items:flex-start;
-                                """
-                            ),
-                            ui.hr(
-                                style="""
-                                border:none;
-                                border-top:1px solid;
-                                margin-top:4px;
-                                margin-bottom:6px;
-                                """
-                            ),
+                            timeline_header(),
                             information_about_wave(),
                             output_widget("timeline", fillable=True)),
                         icon=icon_svg('gamepad'),
