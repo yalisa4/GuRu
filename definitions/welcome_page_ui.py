@@ -53,5 +53,7 @@ def welcome_page(tab_name):
                             timeline_header(),
                             information_about_wave(),
                             output_widget("timeline", fillable=True)),
+
+                            ui.tags.script(src="custom_js_components/timeline_labels.js"),
                         icon=icon_svg('gamepad'),
                         value=tab_name)
